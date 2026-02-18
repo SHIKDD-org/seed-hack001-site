@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import gsap from 'gsap';
 import $ from 'jquery';
-import { config } from '@/config';
+import { useConfig } from '@/config';
+import { useAuth } from '@/contexts/AuthContext';
 
 /* ─── Mock Data (replace with API later) ─── */
 const MOCK_TEAM = {
@@ -48,7 +49,7 @@ const MOCK_CHECKLIST = [
   { id: 9, label: 'Submit final project', done: false },
 ];
 
-const MOCK_SCHEDULE = [
+const MOCK_SCHEDULE = (config: ReturnType<typeof useConfig>) => [
   { label: 'Registration Opens', date: config.registrationStart, status: 'completed' as const },
   { label: 'Hacking Starts', date: config.hackingStart, status: 'upcoming' as const },
   { label: 'Mid-Hackathon Check-in', date: '2026-03-16T12:00:00Z', status: 'upcoming' as const },
@@ -96,11 +97,26 @@ function timeUntil(iso: string) {
 
 /* ─── Component ─── */
 export default function DashboardPage() {
+  const config = useConfig();
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<Section>('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [checklist, setChecklist] = useState(MOCK_CHECKLIST);
   const pageRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/login');
+    }
+  }, [authLoading, user, navigate]);
+
+  useEffect(() => {
+    if (authLoading || !user) return;
+    if (!pageRef.current) return;
+    gsap.fromTo(pageRef.current, { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out' });
+  }, [authLoading, user]);
 
   const accent = config.accentColor;
   const team = MOCK_TEAM;
@@ -421,7 +437,7 @@ export default function DashboardPage() {
         <h3 className="text-xs text-white/30 uppercase tracking-[3px] mb-4">Timeline</h3>
         <div className="relative pl-6">
           <div className="absolute left-[7px] top-2 bottom-2 w-px bg-white/[0.06]" />
-          {MOCK_SCHEDULE.map((ev, i) => (
+          {MOCK_SCHEDULE(config).map((ev, i) => (
             <div key={i} className="relative pb-6 last:pb-0">
               <div
                 className="absolute left-[-19px] top-1.5 w-3.5 h-3.5 border-2 border-[#0a0a0a]"

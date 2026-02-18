@@ -1,19 +1,8 @@
-import siteConfig from '../site.config.json';
+import { useHackathon, type SiteConfig } from './contexts/HackathonContext';
 
-export interface SiteConfig {
-  slug: string;
-  title: string;
-  description: string;
-  accentColor: string;
-  registrationStart: string;
-  hackingStart: string;
-  submissionDeadline: string;
-  maxTeamSize: number;
-  prizePool: string;
-  apiOrigin: string;
-  logoUrl: string | null;
-  bannerUrl: string | null;
-  rules: string | null;
-}
+export const useConfig = () => {
+  const { config } = useHackathon();
+  return config;
+};
 
-export const config: SiteConfig = siteConfig as SiteConfig;
+export type { SiteConfig };

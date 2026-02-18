@@ -2,11 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import $ from 'jquery';
 import gsap from 'gsap';
-import { config } from '@/config';
+import { useConfig } from '@/config';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function LoginPage() {
+  const config = useConfig();
+  const { login } = useAuth();
   const pageRef = useRef<HTMLDivElement>(null);
   const [formData, setFormData] = useState({ email: '', password: '' });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const page = pageRef.current;
@@ -42,15 +47,19 @@ export default function LoginPage() {
 
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    gsap.to('.login-submit-btn', {
-      scale: 0.96, duration: 0.1, yoyo: true, repeat: 1,
-      onComplete: () => {
-        // Skip auth for now — go straight to dashboard
-        navigate('/dashboard');
-      },
-    });
+    setError('');
+    setLoading(true);
+    
+    const result = await login(formData.email, formData.password);
+    
+    if (result.ok) {
+      navigate('/dashboard');
+    } else {
+      setError(result.error || 'Login failed');
+      setLoading(false);
+    }
   };
 
   return (
@@ -180,15 +189,22 @@ export default function LoginPage() {
               </button>
             </div>
 
+            {error && (
+              <div className="login-form-el text-red-400 text-sm text-center py-2">
+                {error}
+              </div>
+            )}
+
             <button
               type="submit"
-              className="login-form-el login-submit-btn w-full py-4 text-base font-black uppercase tracking-[3px] transition-all hover:tracking-[5px] active:scale-[0.98]"
+              disabled={loading}
+              className="login-form-el login-submit-btn w-full py-4 text-base font-black uppercase tracking-[3px] transition-all hover:tracking-[5px] active:scale-[0.98] disabled:opacity-50"
               style={{
                 background: config.accentColor,
                 color: '#000',
               }}
             >
-              Sign In
+              {loading ? 'Signing In...' : 'Sign In'}
             </button>
           </form>
 

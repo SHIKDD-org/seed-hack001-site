@@ -1,13 +1,14 @@
 import { useEffect, useRef } from 'react';
 import $ from 'jquery';
 import gsap from 'gsap';
-import { config } from '@/config';
+import { useConfig } from '@/config';
 
 interface IntroScreenProps {
   onComplete: () => void;
 }
 
 export default function IntroScreen({ onComplete }: IntroScreenProps) {
+  const config = useConfig();
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 

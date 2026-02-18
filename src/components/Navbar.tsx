@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import $ from 'jquery';
 import gsap from 'gsap';
-import { config } from '@/config';
+import { useConfig } from '@/config';
 
 export default function Navbar() {
+  const config = useConfig();
   const navRef = useRef<HTMLElement>(null);
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);

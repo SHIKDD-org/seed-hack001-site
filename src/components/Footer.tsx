@@ -2,9 +2,10 @@ import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import $ from 'jquery';
 import gsap from 'gsap';
-import { config } from '@/config';
+import { useConfig } from '@/config';
 
 export default function Footer() {
+  const config = useConfig();
   const footerRef = useRef<HTMLElement>(null);
 
   useEffect(() => {

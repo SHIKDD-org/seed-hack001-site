@@ -1,12 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import $ from 'jquery';
 import gsap from 'gsap';
-import { config } from '@/config';
+import { useConfig } from '@/config';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function RegisterPage() {
+  const config = useConfig();
+  const { register } = useAuth();
+  const navigate = useNavigate();
   const pageRef = useRef<HTMLDivElement>(null);
   const [formData, setFormData] = useState({ name: '', email: '', password: '', confirmPassword: '' });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const page = pageRef.current;
@@ -36,14 +42,24 @@ export default function RegisterPage() {
     });
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    gsap.to('.reg-submit-btn', {
-      scale: 0.96, duration: 0.1, yoyo: true, repeat: 1,
-      onComplete: () => {
-        console.log('Register:', formData);
-      },
-    });
+    setError('');
+    
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+    
+    setLoading(true);
+    const result = await register(formData.email, formData.name, formData.password);
+    
+    if (result.ok) {
+      navigate('/dashboard');
+    } else {
+      setError(result.error || 'Registration failed');
+      setLoading(false);
+    }
   };
 
   return (
@@ -207,15 +223,22 @@ export default function RegisterPage() {
               </span>
             </div>
 
+            {error && (
+              <div className="reg-form-el text-red-400 text-sm text-center py-2">
+                {error}
+              </div>
+            )}
+
             <button
               type="submit"
-              className="reg-form-el reg-submit-btn w-full py-4 text-base font-black uppercase tracking-[3px] transition-all hover:tracking-[5px] active:scale-[0.98]"
+              disabled={loading}
+              className="reg-form-el reg-submit-btn w-full py-4 text-base font-black uppercase tracking-[3px] transition-all hover:tracking-[5px] active:scale-[0.98] disabled:opacity-50"
               style={{
                 background: config.accentColor,
                 color: '#000',
               }}
             >
-              Create Account
+              {loading ? 'Creating Account...' : 'Create Account'}
             </button>
           </form>
 

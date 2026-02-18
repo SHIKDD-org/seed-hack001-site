@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import $ from 'jquery';
 import gsap from 'gsap';
-import { config } from '@/config';
+import { useConfig } from '@/config';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -9,6 +9,7 @@ interface LoginModalProps {
 }
 
 export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
+  const config = useConfig();
   const modalRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const [isSignUp, setIsSignUp] = useState(false);

@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react';
 import $ from 'jquery';
 import gsap from 'gsap';
-import { config } from '@/config';
+import { useConfig } from '@/config';
 
 export default function About() {
+  const config = useConfig();
   const sectionRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
