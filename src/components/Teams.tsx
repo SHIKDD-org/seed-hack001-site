@@ -29,7 +29,6 @@ export default function Teams() {
 
     fetch(`${config.apiOrigin}/api/v1/hackathons/${config.slug}/teams`, {
       signal: controller.signal,
-      credentials: 'include',
     })
       .then((res) => {
         if (!res.ok) throw new Error(`API returned ${res.status}`);
