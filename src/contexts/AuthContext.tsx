@@ -15,6 +15,8 @@ interface AuthContextType {
   token: string | null;
   login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
   register: (email: string, name: string, password: string) => Promise<{ ok: boolean; error?: string }>;
+  loginWithGitHub: () => void;
+  loginWithGoogle: () => void;
   logout: () => Promise<void>;
 }
 
@@ -37,6 +39,8 @@ const AuthContext = createContext<AuthContextType>({
   token: null,
   login: async () => ({ ok: false }),
   register: async () => ({ ok: false }),
+  loginWithGitHub: () => {},
+  loginWithGoogle: () => {},
   logout: async () => {},
 });
 
@@ -54,10 +58,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [token, setToken] = useState<string | null>(getStoredToken);
   const [loading, setLoading] = useState(true);
 
-  // Verify stored token on mount
+  // Verify stored token on mount + handle OAuth callback
   useEffect(() => {
     async function checkAuth() {
-      const stored = getStoredToken();
+      // Handle OAuth callback (token in URL hash or query params)
+      const params = new URLSearchParams(window.location.search);
+      const callbackToken = params.get('token') || params.get('access_token');
+      if (callbackToken) {
+        localStorage.setItem(TOKEN_KEY, callbackToken);
+        setToken(callbackToken);
+        // Clean URL
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+
+      const stored = callbackToken || getStoredToken();
       if (!stored) {
         setLoading(false);
         return;
@@ -69,6 +83,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const data = await res.json();
         if (data.ok && data.data?.user) {
           setUser(data.data.user);
+          localStorage.setItem(USER_KEY, JSON.stringify(data.data.user));
         } else {
           localStorage.removeItem(TOKEN_KEY);
           localStorage.removeItem(USER_KEY);
@@ -151,6 +166,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
+  const loginWithGitHub = () => {
+    window.location.href = `${config.apiOrigin}/auth/github`;
+  };
+
+  const loginWithGoogle = () => {
+    window.location.href = `${config.apiOrigin}/auth/google`;
+  };
+
   const logout = async () => {
     try {
       if (token) {
@@ -167,7 +190,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, token, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, token, login, register, loginWithGitHub, loginWithGoogle, logout }}>
       {children}
     </AuthContext.Provider>
   );

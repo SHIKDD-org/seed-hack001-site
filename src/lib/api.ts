@@ -18,23 +18,19 @@ function hackathonSlug(): string {
   return (import.meta.env.VITE_HACKATHON_SLUG as string) || 'my-hackathon';
 }
 
-function getStoredToken(): string | null {
-  try { return localStorage.getItem('devsage_access_token'); } catch { return null; }
-}
 
 async function apiFetch<T = unknown>(
   path: string,
   init?: RequestInit
 ): Promise<{ ok: boolean; data?: T; error?: { code: string; message: string }; meta?: Record<string, unknown> }> {
-  const token = getStoredToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(init?.headers as Record<string, string> || {}),
   };
   const res = await fetch(`${apiOrigin()}${path}`, {
     ...init,
     headers,
+    credentials: 'include',
   });
   return res.json();
 }
@@ -341,4 +337,73 @@ export interface User {
   avatar_url: string | null;
   github_username?: string;
   created_at?: string;
+}
+
+// ─── Team Repos ─────────────────────────────────────────────
+
+export interface TeamRepo {
+  id: string;
+  team_id: string;
+  github_repo_url: string;
+  github_owner: string;
+  github_repo: string;
+  linked_by: string;
+}
+
+export async function linkTeamRepo(teamId: string, githubRepoUrl: string, slug?: string) {
+  const s = slug || hackathonSlug();
+  return apiFetch<TeamRepo>(`/api/v1/hackathons/${s}/teams/${teamId}/repo`, {
+    method: 'POST',
+    body: JSON.stringify({ github_repo_url: githubRepoUrl }),
+  });
+}
+
+export async function getTeamRepo(teamId: string, slug?: string) {
+  const s = slug || hackathonSlug();
+  return apiFetch<TeamRepo>(`/api/v1/hackathons/${s}/teams/${teamId}/repo`);
+}
+
+export async function unlinkTeamRepo(teamId: string, slug?: string) {
+  const s = slug || hackathonSlug();
+  return apiFetch(`/api/v1/hackathons/${s}/teams/${teamId}/repo`, {
+    method: 'DELETE',
+  });
+}
+
+// ─── Notifications ──────────────────────────────────────────
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  hackathon_id: string | null;
+  type: string;
+  title: string;
+  body: string;
+  link: string | null;
+  read_at: string | null;
+  created_at: string;
+}
+
+export async function listNotifications(limit = 20, offset = 0) {
+  return apiFetch<Notification[]>(`/api/v1/notifications?limit=${limit}&offset=${offset}`);
+}
+
+export async function getUnreadCount() {
+  return apiFetch<{ count: number }>('/api/v1/notifications/unread-count');
+}
+
+// ─── Leaderboard (Judging) ──────────────────────────────────
+
+export interface LeaderboardEntry {
+  team_id: string;
+  team_name: string;
+  avg_score: number;
+  rank: number;
+}
+
+export async function getJudgingLeaderboard(slug?: string, roundId?: string) {
+  const s = slug || hackathonSlug();
+  let path = `/api/v1/hackathons/${s}/judging/leaderboard`;
+  if (roundId) path += `?round_id=${roundId}`;
+  return apiFetch<LeaderboardEntry[]>(path);
 }

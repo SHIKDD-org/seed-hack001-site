@@ -120,6 +120,21 @@ export default function DashboardPage() {
   const [leaderboard, setLeaderboard] = useState<api.AiLeaderboardEntry[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
 
+  // Repo linking state
+  const [teamRepo, setTeamRepo] = useState<api.TeamRepo | null>(null);
+  const [repoLinkUrl, setRepoLinkUrl] = useState('');
+  const [linkingRepo, setLinkingRepo] = useState(false);
+  const [repoLinkError, setRepoLinkError] = useState('');
+
+  // Notifications state
+  const [notifications, setNotifications] = useState<api.Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  // Judging leaderboard
+  const [judgingLeaderboard, setJudgingLeaderboard] = useState<api.LeaderboardEntry[]>([]);
+  const [_judgingLeaderboardLoading, _setJudgingLeaderboardLoading] = useState(false);
+
   // ─── Redirect if not authenticated ───
   useEffect(() => {
     if (!authLoading && !user) navigate('/login');
@@ -180,12 +195,35 @@ export default function DashboardPage() {
       const roundsRes = await api.listRounds(slug);
       if (roundsRes.ok && roundsRes.data) {
         setRounds(roundsRes.data);
-        // Auto-select the first initialized round
         const initializedRound = roundsRes.data.find((r: api.Round) => r.is_initialized);
         if (initializedRound) {
           setSelectedRoundId(initializedRound.id);
         }
       }
+    } catch { /* ignore */ }
+
+    // Team repo
+    if (teamData) {
+      try {
+        const repoRes = await api.getTeamRepo(teamData.team.id, slug);
+        if (repoRes.ok && repoRes.data) setTeamRepo(repoRes.data);
+      } catch { /* no repo linked */ }
+    }
+
+    // Notifications
+    try {
+      const [notifRes, countRes] = await Promise.all([
+        api.listNotifications(10),
+        api.getUnreadCount(),
+      ]);
+      if (notifRes.ok && notifRes.data) setNotifications(notifRes.data);
+      if (countRes.ok && countRes.data) setUnreadCount(countRes.data.count);
+    } catch { /* ignore */ }
+
+    // Judging leaderboard
+    try {
+      const lbRes = await api.getJudgingLeaderboard(slug);
+      if (lbRes.ok && lbRes.data) setJudgingLeaderboard(lbRes.data);
     } catch { /* ignore */ }
   }, [config.slug]);
 
@@ -240,6 +278,32 @@ export default function DashboardPage() {
       else setTeamActionError(res.error?.message || 'Failed to leave team');
     } catch { setTeamActionError('Network error'); }
     setTeamActionLoading(false);
+  };
+
+  const handleLinkRepo = async () => {
+    if (!teamData || !repoLinkUrl.trim()) return;
+    setLinkingRepo(true);
+    setRepoLinkError('');
+    try {
+      const res = await api.linkTeamRepo(teamData.team.id, repoLinkUrl.trim(), config.slug);
+      if (res.ok && res.data) {
+        setTeamRepo(res.data);
+        setRepoLinkUrl('');
+      } else {
+        setRepoLinkError(res.error?.message || 'Failed to link repo');
+      }
+    } catch { setRepoLinkError('Network error'); }
+    setLinkingRepo(false);
+  };
+
+  const handleUnlinkRepo = async () => {
+    if (!teamData) return;
+    setLinkingRepo(true);
+    try {
+      const res = await api.unlinkTeamRepo(teamData.team.id, config.slug);
+      if (res.ok) setTeamRepo(null);
+    } catch { /* ignore */ }
+    setLinkingRepo(false);
   };
 
   const handleSubmit = async () => {
@@ -431,6 +495,54 @@ export default function DashboardPage() {
               </div>
             )}
             {teamActionError && <p className="text-xs text-red-400 mt-2">{teamActionError}</p>}
+          </div>
+
+          {/* Repo Linking Section */}
+          <div>
+            <h3 className="text-xs text-white/30 uppercase tracking-[3px] mb-3">Linked Repository</h3>
+            {teamRepo ? (
+              <div className="flex items-center justify-between p-4 bg-white/2 border border-white/6">
+                <div className="flex items-center gap-3">
+                  <span className="text-lg">📦</span>
+                  <div>
+                    <a href={teamRepo.github_repo_url} target="_blank" rel="noopener noreferrer" className="text-sm font-bold hover:underline" style={{ color: accent }}>
+                      {teamRepo.github_owner}/{teamRepo.github_repo}
+                    </a>
+                    <p className="text-[10px] text-white/30 uppercase tracking-wider">Webhooks connected · Push tracking active</p>
+                  </div>
+                </div>
+                {teamData.role === 'leader' && (
+                  <button onClick={handleUnlinkRepo} disabled={linkingRepo} className="text-xs uppercase tracking-wider px-3 py-1.5 border border-red-500/30 text-red-400/70 hover:text-red-400 hover:border-red-500/50 transition-all disabled:opacity-40">
+                    {linkingRepo ? '...' : 'Unlink'}
+                  </button>
+                )}
+              </div>
+            ) : teamData.role === 'leader' ? (
+              <div className="p-4 bg-white/2 border border-white/6 space-y-3">
+                <p className="text-sm text-white/50">Link your team's GitHub repository to enable push tracking and tag-based submissions.</p>
+                <div className="flex gap-3">
+                  <input
+                    value={repoLinkUrl}
+                    onChange={(e) => setRepoLinkUrl(e.target.value)}
+                    placeholder="https://github.com/owner/repo"
+                    className="flex-1 px-4 py-2.5 bg-white/3 border border-white/10 text-sm text-white placeholder-white/20 font-mono focus:outline-none focus:border-white/20"
+                  />
+                  <button
+                    onClick={handleLinkRepo}
+                    disabled={linkingRepo || !repoLinkUrl.trim()}
+                    className="px-5 py-2.5 text-xs font-bold uppercase tracking-wider disabled:opacity-40"
+                    style={{ background: accent, color: '#000' }}
+                  >
+                    {linkingRepo ? '...' : 'Link Repo'}
+                  </button>
+                </div>
+                {repoLinkError && <p className="text-xs text-red-400">{repoLinkError}</p>}
+              </div>
+            ) : (
+              <div className="p-4 bg-white/2 border border-white/6">
+                <p className="text-sm text-white/40">No repository linked yet. Your team leader can link one.</p>
+              </div>
+            )}
           </div>
         </>
       ) : (
@@ -988,6 +1100,41 @@ export default function DashboardPage() {
             ))}
           </div>
         )}
+
+        {/* Official Judging Leaderboard */}
+        {judgingLeaderboard.length > 0 && (
+          <>
+            <div className="mt-8 pt-6 border-t border-white/6">
+              <h3 className="text-xl font-black uppercase tracking-tight mb-1">Official Results<span style={{ color: accent }}>.</span></h3>
+              <p className="text-white/40 text-xs uppercase tracking-wider">Judge-scored rankings</p>
+            </div>
+            <div className="space-y-2">
+              {judgingLeaderboard.map((entry, idx) => (
+                <div
+                  key={entry.team_id}
+                  className={`flex items-center gap-4 p-4 border transition-all hover:border-white/15 ${
+                    entry.team_id === teamData?.team.id ? 'bg-white/5 border-white/15' : 'bg-white/2 border-white/6'
+                  } ${idx < 3 ? 'border-l-2' : ''}`}
+                  style={idx < 3 ? { borderLeftColor: accent } : {}}
+                >
+                  <div className="w-10 text-center">{rankBadge(entry.rank || idx + 1)}</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-white/80 truncate">
+                      {entry.team_name}
+                      {entry.team_id === teamData?.team.id && (
+                        <span className="ml-2 text-[9px] px-1.5 py-0.5 uppercase tracking-wider font-bold" style={{ background: `${accent}20`, color: accent }}>You</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-xl font-black" style={{ color: accent }}>{Math.round(entry.avg_score * 10) / 10}</p>
+                    <p className="text-[9px] text-white/20 uppercase tracking-wider">avg score</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     );
   };
@@ -1087,6 +1234,46 @@ export default function DashboardPage() {
             <div className="flex items-center gap-4">
               <span className="text-xs text-white/20 uppercase tracking-wider">{timeUntil(config.submissionDeadline)} until deadline</span>
               <div className="w-px h-4 bg-white/10" />
+              {/* Notification Bell */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowNotifications(!showNotifications)}
+                  className="relative p-1.5 text-white/40 hover:text-white/70 transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full text-[8px] font-bold text-black" style={{ background: accent }}>
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+                {showNotifications && (
+                  <div className="absolute right-0 top-full mt-2 w-80 max-h-96 overflow-y-auto border border-white/10 bg-[#0a0a0a]/95 backdrop-blur-xl shadow-2xl z-50">
+                    <div className="sticky top-0 flex items-center justify-between px-4 py-3 border-b border-white/6 bg-[#0a0a0a]">
+                      <span className="text-xs font-bold text-white/60 uppercase tracking-wider">Notifications</span>
+                      {unreadCount > 0 && <span className="text-[10px] px-1.5 py-0.5 font-bold" style={{ background: `${accent}20`, color: accent }}>{unreadCount} new</span>}
+                    </div>
+                    {notifications.length === 0 ? (
+                      <div className="p-6 text-center"><p className="text-xs text-white/30">No notifications yet</p></div>
+                    ) : (
+                      notifications.map(n => (
+                        <div key={n.id} className={`px-4 py-3 border-b border-white/4 hover:bg-white/3 transition-colors ${!n.read_at ? 'bg-white/[0.02]' : ''}`}>
+                          <div className="flex items-start gap-2">
+                            {!n.read_at && <div className="mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: accent }} />}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold text-white/80">{n.title}</p>
+                              <p className="text-[11px] text-white/40 mt-0.5 line-clamp-2">{n.body}</p>
+                              <p className="text-[10px] text-white/20 mt-1">{new Date(n.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 bg-white/6 flex items-center justify-center text-xs font-bold" style={{ color: accent }}>{user.name.charAt(0).toUpperCase()}</div>
                 <span className="text-xs text-white/50">{user.name}</span>
